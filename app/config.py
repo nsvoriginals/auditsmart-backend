@@ -21,13 +21,6 @@ class Settings(BaseSettings):
     RAZORPAY_KEY_ID: str = ""
     RAZORPAY_KEY_SECRET: str = ""
 
-    # Stripe
-    STRIPE_SECRET_KEY: str = ""
-    STRIPE_WEBHOOK_SECRET: str = ""
-
-    # NOWPayments
-    NOWPAYMENTS_API_KEY: str = ""
-
     # App
     FRONTEND_URL: str = "https://auditsmart.org"
     FREE_AUDITS_LIMIT: int = 3

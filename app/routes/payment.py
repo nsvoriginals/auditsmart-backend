@@ -4,6 +4,8 @@ from app.utils.auth import get_current_user
 from app.database import get_db
 from app.config import settings
 from datetime import datetime
+import hmac
+import hashlib
 
 router = APIRouter()
 
@@ -26,7 +28,7 @@ async def create_razorpay_order(
             settings.RAZORPAY_KEY_SECRET
         ))
 
-        plan_prices = {"pro": 4099, "enterprise": 49999}  # paise
+        plan_prices = {"pro": 4099, "enterprise": 49999}  # paise (INR)
         amount = plan_prices.get(req.plan, 4099)
 
         order = client.order.create({
@@ -47,12 +49,12 @@ async def create_razorpay_order(
     except Exception as e:
         raise HTTPException(500, f"Razorpay error: {str(e)}")
 
+
 @router.post("/razorpay/verify")
 async def verify_razorpay(
     request: Request,
     current_user: dict = Depends(get_current_user)
 ):
-    import hmac, hashlib
     body = await request.json()
 
     order_id   = body.get("razorpay_order_id", "")
@@ -60,7 +62,7 @@ async def verify_razorpay(
     signature  = body.get("razorpay_signature", "")
     plan       = body.get("plan", "pro")
 
-    # Verify signature
+    # Verify Razorpay signature
     expected = hmac.new(
         settings.RAZORPAY_KEY_SECRET.encode(),
         f"{order_id}|{payment_id}".encode(),
@@ -73,82 +75,6 @@ async def verify_razorpay(
     await _activate_plan(current_user["_id"], plan, payment_id, "razorpay")
     return {"status": "success", "plan": plan}
 
-# ─── STRIPE ─────────────────────────────────────────────
-class StripeSessionRequest(BaseModel):
-    plan: str
-
-@router.post("/stripe/create-session")
-async def create_stripe_session(
-    req: StripeSessionRequest,
-    current_user: dict = Depends(get_current_user)
-):
-    if not settings.STRIPE_SECRET_KEY:
-        raise HTTPException(503, "Stripe not configured")
-
-    try:
-        import stripe
-        stripe.api_key = settings.STRIPE_SECRET_KEY
-
-        plan_prices = {
-            "pro": "price_pro_monthly",
-            "enterprise": "price_enterprise_monthly"
-        }
-
-        session = stripe.checkout.Session.create(
-            payment_method_types=["card"],
-            mode="subscription",
-            line_items=[{
-                "price": plan_prices.get(req.plan, "price_pro_monthly"),
-                "quantity": 1
-            }],
-            success_url=f"{settings.FRONTEND_URL}?payment=success&plan={req.plan}",
-            cancel_url=f"{settings.FRONTEND_URL}?payment=cancelled",
-            client_reference_id=str(current_user["_id"]),
-            customer_email=current_user.get("email", "")
-        )
-        return {"session_url": session.url, "session_id": session.id}
-
-    except Exception as e:
-        raise HTTPException(500, f"Stripe error: {str(e)}")
-
-# ─── NOWPayments (Crypto) ────────────────────────────────
-class CryptoPaymentRequest(BaseModel):
-    plan: str
-    currency: str = "USDT"
-
-@router.post("/crypto/create-payment")
-async def create_crypto_payment(
-    req: CryptoPaymentRequest,
-    current_user: dict = Depends(get_current_user)
-):
-    if not settings.NOWPAYMENTS_API_KEY:
-        raise HTTPException(503, "NOWPayments not configured")
-
-    try:
-        import httpx
-        plan_usd = {"pro": 49, "enterprise": 499}
-        amount = plan_usd.get(req.plan, 49)
-
-        async with httpx.AsyncClient() as client:
-            res = await client.post(
-                "https://api.nowpayments.io/v1/payment",
-                headers={
-                    "x-api-key": settings.NOWPAYMENTS_API_KEY,
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "price_amount": amount,
-                    "price_currency": "usd",
-                    "pay_currency": req.currency.lower(),
-                    "order_id": f"{current_user['_id']}_{req.plan}",
-                    "order_description": f"AuditSmart {req.plan.capitalize()} Plan",
-                    "ipn_callback_url": f"{settings.FRONTEND_URL}/api/payment/crypto/webhook"
-                }
-            )
-            return res.json()
-
-    except Exception as e:
-        raise HTTPException(500, f"Crypto payment error: {str(e)}")
 
 # ─── Internal helper ─────────────────────────────────────
 async def _activate_plan(user_id, plan: str, payment_id: str, gateway: str):
