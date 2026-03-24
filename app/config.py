@@ -1,43 +1,55 @@
 from pydantic_settings import BaseSettings
-from typing import Optional
 
 
 class Settings(BaseSettings):
-    # MongoDB
+    # ── MongoDB ────────────────────────────────────────────────────────────────
     MONGODB_URL: str = "mongodb://localhost:27017"
     DB_NAME: str = "auditsmart"
 
-    # JWT
+    # ── JWT ───────────────────────────────────────────────────────────────────
     JWT_SECRET: str = "change-this-secret-in-production"
     JWT_ALGORITHM: str = "HS256"
-    JWT_EXPIRE_HOURS: int = 168  # 7 days
+    JWT_EXPIRE_HOURS: int = 168
 
-    # Groq
+    # ── AI APIs ───────────────────────────────────────────────────────────────
     GROQ_API_KEY: str = ""
+    GEMINI_API_KEY: str = ""           # Free plan uses this
+    ANTHROPIC_API_KEY: str = ""        # Pro, Enterprise, Deep Audit
 
-    # Gemini
-    GEMINI_API_KEY: str = ""
-
-    # Razorpay
-    RAZORPAY_KEY_ID: str = ""
-    RAZORPAY_KEY_SECRET: str = ""
-
-    # App
-    FRONTEND_URL: str = "https://auditsmart.org"
-    FREE_AUDITS_LIMIT: int = 3
-
-    # v2.0 — PDF & Features
-    PDF_ENABLED: bool = True  # Free tier gets PDF too
-    MAX_CONTRACT_SIZE: int = 50000  # 50KB max contract
-    RATE_LIMIT_PER_MINUTE: int = 5
-    
-    # v2.0 — Enhanced Agents
+    # ── Groq Settings ─────────────────────────────────────────────────────────
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
     GROQ_MAX_TOKENS: int = 4096
     GROQ_TEMPERATURE: float = 0.1
-    GEMINI_MODEL: str = "gemini-1.5-pro"
-    GEMINI_MAX_TOKENS: int = 8192
     AGENT_TIMEOUT_SECONDS: int = 120
+
+    # ── Claude Model Map ──────────────────────────────────────────────────────
+    # free       → Groq + Gemini              (~$0.05/audit)
+    # pro        → Groq + claude-haiku        (~$0.12/audit)
+    # enterprise → Groq + claude-sonnet       (~$0.49/audit)
+    # deep_audit → Full claude-opus-4-5 only  (~$1.78/audit, charges $20)
+    CLAUDE_HAIKU_MODEL: str = "claude-haiku-4-5-20251001"
+    CLAUDE_SONNET_MODEL: str = "claude-sonnet-4-6"
+    CLAUDE_OPUS_MODEL: str = "claude-opus-4-5"
+    CLAUDE_TIMEOUT_SECONDS: int = 120
+
+    # ── Payments ──────────────────────────────────────────────────────────────
+    RAZORPAY_KEY_ID: str = ""
+    RAZORPAY_KEY_SECRET: str = ""
+
+    # ── Plan Limits ───────────────────────────────────────────────────────────
+    FREE_AUDITS_LIMIT: int = 3
+    PRO_AUDITS_LIMIT: int = 20
+    ENTERPRISE_AUDITS_LIMIT: int = 50
+
+    # ── Deep Audit Pricing ────────────────────────────────────────────────────
+    DEEP_AUDIT_PRICE_INR: int = 1650   # ~$20 USD in INR paise = 165000 paise
+    DEEP_AUDIT_PRICE_USD: float = 20.0
+
+    # ── App ───────────────────────────────────────────────────────────────────
+    FRONTEND_URL: str = "https://auditsmart.org"
+    MAX_CONTRACT_SIZE: int = 50000
+    RATE_LIMIT_PER_MINUTE: int = 5
+    PDF_ENABLED: bool = True
 
     class Config:
         env_file = ".env"
@@ -46,15 +58,11 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# --- STARTUP DIAGNOSTICS ---
-print("=" * 50)
-print("AuditSmart v2.0 Config Loaded:")
-print(f"  MONGODB_URL: {'SET (' + settings.MONGODB_URL[:20] + '...)' if settings.MONGODB_URL else 'MISSING!'}")
-print(f"  GROQ_API_KEY: {'SET (' + settings.GROQ_API_KEY[:8] + '...)' if settings.GROQ_API_KEY else 'MISSING!'}")
-print(f"  GEMINI_API_KEY: {'SET (' + settings.GEMINI_API_KEY[:8] + '...)' if settings.GEMINI_API_KEY else 'MISSING!'}")
-print(f"  RAZORPAY_KEY_ID: {'SET' if settings.RAZORPAY_KEY_ID else 'MISSING!'}")
-print(f"  FRONTEND_URL: {settings.FRONTEND_URL}")
-print(f"  FREE_AUDITS_LIMIT: {settings.FREE_AUDITS_LIMIT}")
-print(f"  PDF_ENABLED: {settings.PDF_ENABLED}")
-print(f"  GROQ_MODEL: {settings.GROQ_MODEL}")
-print("=" * 50)
+print("=" * 55)
+print("AuditSmart v3.0 Config:")
+print(f"  GROQ:        {'✅' if settings.GROQ_API_KEY else '❌ MISSING'}")
+print(f"  GEMINI:      {'✅' if settings.GEMINI_API_KEY else '❌ MISSING'} (Free plan)")
+print(f"  ANTHROPIC:   {'✅' if settings.ANTHROPIC_API_KEY else '❌ MISSING'} (Pro/Ent/Deep)")
+print(f"  RAZORPAY:    {'✅' if settings.RAZORPAY_KEY_ID else '⚠️  Not set'}")
+print(f"  Plans: Free(3) | Pro(20) | Ent(50) | DeepAudit($20/ea)")
+print("=" * 55)
